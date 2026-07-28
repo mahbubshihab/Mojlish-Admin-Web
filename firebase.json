@@ -1,0 +1,11 @@
+{
+  "apphosting": {
+    "backendId": "mojlish-admin-web",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".next"
+    ]
+  }
+}
