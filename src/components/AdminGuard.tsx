@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, ReactNode } from 'react';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
@@ -9,15 +9,33 @@ import {
   onAuthStateChanged, 
   User 
 } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
-const ALLOWED_EMAILS = [
+export const SUPER_ADMIN_EMAILS = [
   'magician290@gmail.com',
   'xlshihab9@gmail.com',
 ];
 
-const isAllowedEmail = (email: string | null | undefined): boolean => {
+export const checkIsAuthorizedAdmin = async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false;
-  return ALLOWED_EMAILS.includes(email.toLowerCase().trim());
+  const cleanEmail = email.toLowerCase().trim();
+  
+  // Super Admins always have access
+  if (SUPER_ADMIN_EMAILS.includes(cleanEmail)) {
+    return true;
+  }
+
+  // Check Firestore 'allowed_admins' collection
+  try {
+    const adminDocRef = doc(db, 'allowed_admins', cleanEmail);
+    const adminDoc = await getDoc(adminDocRef);
+    if (adminDoc.exists() && adminDoc.data()?.active !== false) {
+      return true;
+    }
+  } catch (err) {
+    console.error('Error checking admin authorization:', err);
+  }
+  return false;
 };
 
 export default function AdminGuard({ children }: { children: ReactNode }) {
@@ -29,13 +47,14 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        if (isAllowedEmail(currentUser.email)) {
+        const isAuthorized = await checkIsAuthorizedAdmin(currentUser.email);
+        if (isAuthorized) {
           setUser(currentUser);
           setError('');
         } else {
           await signOut(auth);
           setUser(null);
-          setError(`Access Denied: ${currentUser.email || 'Unauthorized Email'}`);
+          setError(`অ্যাক্সেস অনুমোদিত নয়: ${currentUser.email || 'অনুমোদনহীন ইমেইল'}`);
         }
       } else {
         setUser(null);
@@ -54,15 +73,16 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email;
-      if (!isAllowedEmail(email)) {
+      const isAuthorized = await checkIsAuthorizedAdmin(email);
+      if (!isAuthorized) {
         await signOut(auth);
         setUser(null);
-        setError(`Access Denied: ${email || 'Unauthorized Email'}`);
+        setError(`অ্যাক্সেস অনুমোদিত নয়: ${email || 'অনুমোদনহীন ইমেইল'}`);
       }
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user') {
         console.error('Sign in error:', err);
-        setError('Authentication failed. Please check network and try again.');
+        setError('অ্যাডমিন প্যানেলে সাইন-ইন করতে ব্যর্থ হয়েছে। ইন্টারনেট সংযোগ চেক করুন।');
       }
     } finally {
       setIsSigningIn(false);
@@ -97,13 +117,13 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
           }
         `}</style>
         <p style={{ color: '#94A3B8', fontWeight: 600, fontSize: '14px', letterSpacing: '0.5px' }}>
-          Authenticating...
+          অ্যাডমিন অ্যাক্সেস যাচাই করা হচ্ছে...
         </p>
       </div>
     );
   }
 
-  // If not logged in or not authorized, render the Premium Minimal Animated Login Page UI
+  // If not logged in or not authorized, render Login Page UI
   if (!user) {
     return (
       <div style={{
@@ -117,7 +137,6 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* CSS Keyframes for High-Level Background Mesh & Card Edge Glow Animations */}
         <style jsx>{`
           @keyframes floatBlob1 {
             0% { transform: translate(0px, 0px) scale(1); }
@@ -140,10 +159,6 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
-          @keyframes pulseGlow {
-            0%, 100% { opacity: 0.6; filter: blur(20px); }
-            50% { opacity: 0.9; filter: blur(28px); }
-          }
           .grid-overlay {
             background-size: 40px 40px;
             background-image: 
@@ -152,7 +167,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
           }
         `}</style>
 
-        {/* High-Level Animated Mesh Gradient Background Blobs */}
+        {/* Animated Mesh Gradient Background Blobs */}
         <div style={{
           position: 'absolute',
           top: '10%',
@@ -197,18 +212,18 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
           pointerEvents: 'none'
         }} />
 
-        {/* Animated Edge Glowing Card Wrapper */}
+        {/* Card Wrapper */}
         <div style={{
           position: 'relative',
           width: '100%',
           maxWidth: '420px',
           borderRadius: '28px',
-          padding: '2px', // Border space for rotating animated gradient
+          padding: '2px',
           overflow: 'hidden',
           boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
           zIndex: 10
         }}>
-          {/* Animated Rotating Gradient Edge Layer */}
+          {/* Animated Edge Glow */}
           <div style={{
             position: 'absolute',
             top: '-50%',
@@ -220,7 +235,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
             zIndex: 1
           }} />
 
-          {/* Inner Glassmorphism Card */}
+          {/* Inner Card */}
           <div style={{
             position: 'relative',
             zIndex: 2,
@@ -230,7 +245,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
             padding: '44px 36px',
             textAlign: 'center'
           }}>
-            {/* Minimal Logo & Header */}
+            {/* Logo */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
               <div style={{
                 width: '68px',
@@ -254,7 +269,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
               letterSpacing: '-0.5px',
               marginBottom: '6px'
             }}>
-              Mojlish Admin
+              মজলিস অ্যাডমিন প্যানেল
             </h1>
             <p style={{
               fontSize: '13px',
@@ -262,7 +277,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
               letterSpacing: '0.2px',
               marginBottom: '32px'
             }}>
-              Authorized Personnel Only
+              শুধুমাত্র অনুমোদিত অ্যাডমিনগণ প্রবেশ করতে পারবেন
             </p>
 
             {/* Error Banner */}
@@ -311,7 +326,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
               {isSigningIn ? (
                 <>
                   <i className="fa-solid fa-circle-notch fa-spin" style={{ color: '#10B981', fontSize: '17px' }} />
-                  <span>Connecting...</span>
+                  <span>সংযুক্ত করা হচ্ছে...</span>
                 </>
               ) : (
                 <>
@@ -321,7 +336,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  <span>Continue with Google</span>
+                  <span>গুগল অ্যাকাউন্ট দিয়ে প্রবেশ করুন</span>
                 </>
               )}
             </button>
@@ -331,7 +346,6 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  // When logged in and authorized, render children
   return (
     <>
       {children}

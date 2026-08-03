@@ -159,10 +159,10 @@ export default function AnnouncementCreate() {
               >
                 <option value="সকল">সকল ব্যবহারকারী (All App Users)</option>
                 <option value="খেলাফত মজলিস">খেলাফত মজলিস</option>
-                <option value="ছাত্র মজলিস">বাংলাদেশ ইসলামী ছাত্র মজলিস</option>
-                <option value="যুব মজলিস">বাংলাদেশ ইসলামী যুব মজলিস</option>
-                <option value="শ্রমিক মজলিস">বাংলাদেশ ইসলামী শ্রমিক মজলিস</option>
-                <option value="মহিলা মজলিস">খেলাফত মহিলা মজলিস</option>
+                <option value="ইসলামী যুব মজলিস">ইসলামী যুব মজলিস</option>
+                <option value="বাংলাদেশ ইসলামী ছাত্র মজলিস">বাংলাদেশ ইসলামী ছাত্র মজলিস</option>
+                <option value="বাংলাদেশ ইসলামী শ্রমিক মজলিস">বাংলাদেশ ইসলামী শ্রমিক মজলিস</option>
+                <option value="বাংলাদেশ ইসলামী মহিলা মজলিস">বাংলাদেশ ইসলামী মহিলা মজলিস</option>
               </select>
             </div>
 

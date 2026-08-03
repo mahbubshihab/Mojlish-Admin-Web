@@ -13,6 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/applications', label: 'আবেদন সমূহ', icon: 'fa-users' },
     { href: '/announcements', label: 'ঘোষণা', icon: 'fa-bullhorn' },
     { href: '/resources', label: 'রিসোর্স', icon: 'fa-book-open' },
+    { href: '/admins', label: 'অ্যাডমিন অ্যাকাউন্টস', icon: 'fa-user-shield' },
     { href: '/settings', label: 'সেটিংস', icon: 'fa-sliders' },
   ];
 
