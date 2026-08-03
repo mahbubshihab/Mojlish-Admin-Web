@@ -61,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div>
             <div className="sidebar-header">
               <img src="/logo.png" alt="Logo" style={{ height: '40px' }} />
-              <h2 style={{ color: 'var(--primary-dark)', fontSize: '20px', fontWeight: '800' }}>
+              <h2 style={{ color: '#10B981', fontSize: '20px', fontWeight: '800', letterSpacing: '-0.3px' }}>
                 মজলিস এডমিন
               </h2>
             </div>

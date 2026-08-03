@@ -13,6 +13,8 @@ import {
   orderBy 
 } from 'firebase/firestore';
 
+import UserStatsWidget from '@/components/UserStatsWidget';
+
 interface Announcement {
   id: string;
   title: string;
@@ -146,10 +148,12 @@ export default function Announcements() {
 
   return (
     <div>
-      <div style={{ marginBottom: '30px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <h1 style={{ color: 'var(--text-dark)', fontSize: '28px', fontWeight: 'bold' }}>ঘোষণা ও ডাইনামিক নোটিফিকেশন প্যানেল</h1>
-        <p style={{ color: 'var(--text-light)', marginTop: '8px' }}>মোবাইল অ্যাপে ডাইনামিক নোটিফিকেশন ও ঘোষণা পাঠানোর মাধ্যম</p>
+        <p style={{ color: 'var(--text-light)', marginTop: '6px' }}>মোবাইল অ্যাপে ডাইনামিক নোটিফিকেশন ও ঘোষণা পাঠানোর মাধ্যম</p>
       </div>
+
+      <UserStatsWidget />
 
       {successMessage && (
         <div style={{

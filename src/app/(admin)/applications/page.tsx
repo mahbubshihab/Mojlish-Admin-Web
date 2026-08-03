@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 
+import UserStatsWidget from '@/components/UserStatsWidget';
+
 interface Application {
   id: string;
   name: string;
@@ -105,22 +107,17 @@ export default function ApplicationsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '15px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h1 style={{ color: 'var(--text-dark)', fontSize: '28px', fontWeight: 'bold' }}>সদস্যপদ আবেদন সমূহ</h1>
-          <p style={{ color: 'var(--text-light)', marginTop: '8px' }}>মোবাইল অ্যাপ থেকে আসা সকল সদস্যপদ আবেদনের রিয়েল-টাইম তালিকা</p>
+          <p style={{ color: 'var(--text-light)', marginTop: '6px' }}>মোবাইল অ্যাপ থেকে আসা সকল সদস্যপদ আবেদনের রিয়েল-টাইম তালিকা</p>
         </div>
         <button onClick={exportCSV} className="btn btn-primary">
           <i className="fa-solid fa-download"></i> এক্সপোর্ট (CSV)
         </button>
       </div>
 
-      <div style={{ maxWidth: '300px', marginBottom: '20px' }}>
-        <div className="card" style={{ borderLeft: '4px solid var(--primary-color)', padding: '16px 20px', marginBottom: 0 }}>
-          <p style={{ color: 'var(--text-light)', fontSize: '14px', fontWeight: '600' }}>সর্বমোট আবেদন সংখ্যা</p>
-          <h2 style={{ fontSize: '32px', margin: '6px 0', color: 'var(--text-dark)', fontWeight: '800' }}>{totalItems}</h2>
-        </div>
-      </div>
+      <UserStatsWidget />
 
       <div className="card">
         {isLoading ? (
