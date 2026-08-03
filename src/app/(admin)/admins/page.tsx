@@ -13,6 +13,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import CustomModal from '@/components/CustomModal';
+import { isSuperAdmin } from '@/components/AdminGuard';
 
 interface AdminUserDoc {
   id: string;
@@ -28,6 +29,7 @@ const HIDDEN_SUPER_ADMINS = [
 
 export default function AdminsPage() {
   const currentUser = auth.currentUser;
+  const userIsSuperAdmin = isSuperAdmin(currentUser?.email);
   const [adminList, setAdminList] = useState<AdminUserDoc[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newEmail, setNewEmail] = useState('');
@@ -187,6 +189,33 @@ export default function AdminsPage() {
       return 'অজানা তারিখ';
     }
   };
+
+  if (!userIsSuperAdmin) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          color: '#EF4444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '28px',
+          margin: '0 auto 16px'
+        }}>
+          <i className="fa-solid fa-lock" />
+        </div>
+        <h2 style={{ color: '#F8FAFC', fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
+          অনুমোদনহীন পৃষ্ঠা
+        </h2>
+        <p style={{ fontSize: '14px', maxWidth: '420px', margin: '0 auto 20px' }}>
+          শুধুমাত্র প্রধান সুপার অ্যাডমিনগণ অ্যাডমিন অ্যাকাউন্ট যুক্ত ও অ্যাক্সেস পরিচালনা করতে পারবেন।
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -16,6 +16,11 @@ export const SUPER_ADMIN_EMAILS = [
   'xlshihab9@gmail.com',
 ];
 
+export const isSuperAdmin = (email: string | null | undefined): boolean => {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.includes(email.toLowerCase().trim());
+};
+
 export const checkIsAuthorizedAdmin = async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false;
   const cleanEmail = email.toLowerCase().trim();

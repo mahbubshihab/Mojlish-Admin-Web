@@ -2,18 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import AdminGuard, { handleSignOutHelper } from '@/components/AdminGuard';
+import AdminGuard, { handleSignOutHelper, isSuperAdmin } from '@/components/AdminGuard';
 import { auth } from '@/lib/firebase';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentUser = auth.currentUser;
+  const userIsSuperAdmin = isSuperAdmin(currentUser?.email);
 
   const links = [
     { href: '/applications', label: 'আবেদন সমূহ', icon: 'fa-users' },
     { href: '/announcements', label: 'ঘোষণা', icon: 'fa-bullhorn' },
     { href: '/resources', label: 'রিসোর্স', icon: 'fa-book-open' },
-    { href: '/admins', label: 'অ্যাডমিন অ্যাকাউন্টস', icon: 'fa-user-shield' },
+    ...(userIsSuperAdmin ? [{ href: '/admins', label: 'অ্যাডমিন অ্যাকাউন্টস', icon: 'fa-user-shield' }] : []),
     { href: '/settings', label: 'সেটিংস', icon: 'fa-sliders' },
   ];
 
