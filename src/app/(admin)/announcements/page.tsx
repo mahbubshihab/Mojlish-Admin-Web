@@ -96,11 +96,27 @@ export default function Announcements() {
         description: description.trim(),
         link: link.trim(),
         targetMajlis,
-        sentBy: auth.currentUser?.email || 'magician290@gmail.com',
         createdAt: serverTimestamp()
       });
 
-      setSuccessMessage('নোটিফিকেশন সফলভাবে পাঠানো হয়েছে এবং ইউনিভার্সাল ডাটাবেজে সংরক্ষণ করা হয়েছে!');
+      // 2. Trigger FCM Push Notification to all subscribed devices
+      try {
+        await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim(),
+            link: link.trim(),
+            targetMajlis,
+            docId: newDocRef.id,
+          }),
+        });
+      } catch (fcmErr) {
+        console.warn('FCM Push notification warning:', fcmErr);
+      }
+
+      setSuccessMessage('নোটিফিকেশন সফলভাবে তৈরি হয়েছে এবং সকল মোবাইলে FCM পুষ্প নোটিফিকেশন হিসেবে পাঠানো হয়েছে!');
       setTitle('');
       setLink('');
       setDescription('');
