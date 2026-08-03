@@ -16,45 +16,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/settings', label: 'সেটিংস', icon: 'fa-sliders' },
   ];
 
-  // Dynamic Page Title for Mobile Topbar
-  const getMobileTitle = () => {
-    switch (pathname) {
-      case '/applications':
-        return 'আবেদন ড্যাশবোর্ড';
-      case '/announcements':
-        return 'ঘোষণা ড্যাশবোর্ড';
-      case '/resources':
-        return 'রিসোর্স ড্যাশবোর্ড';
-      case '/settings':
-        return 'সেটিংস ড্যাশবোর্ড';
-      default:
-        return 'অ্যাডমিন প্যানেল';
-    }
-  };
-
   return (
     <AdminGuard>
       <div className="admin-layout">
-        {/* Mobile Topbar */}
-        <div className="topbar-mobile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-          <h1 className="mobile-header-title" style={{ margin: 0 }}>{getMobileTitle()}</h1>
-          <button 
-            onClick={handleSignOutHelper}
-            title="লগআউট"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#EF4444',
-              fontSize: '16px',
-              cursor: 'pointer',
-              padding: '6px 10px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)'
-            }}
-          >
-            <i className="fa-solid fa-right-from-bracket" />
-          </button>
-        </div>
 
         {/* Desktop Sidebar */}
         <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>

@@ -1,19 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase';
+import Link from 'next/link';
+import { db } from '@/lib/firebase';
 import { 
   collection, 
-  addDoc, 
   deleteDoc, 
   doc, 
   onSnapshot, 
-  serverTimestamp, 
   query, 
   orderBy 
 } from 'firebase/firestore';
-
-import UserStatsWidget from '@/components/UserStatsWidget';
+import CustomModal from '@/components/CustomModal';
 
 interface Announcement {
   id: string;
@@ -28,19 +26,30 @@ interface Announcement {
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Form states
-  const [title, setTitle] = useState('');
-  const [link, setLink] = useState('');
-  const [description, setDescription] = useState('');
-  const [targetMajlis, setTargetMajlis] = useState('সকল');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMajlisFilter, setSelectedMajlisFilter] = useState('সকল');
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
+
+  // Custom Modal State
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'confirm';
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    type: 'confirm',
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Real-time listener for Firestore `notifications` collection
   useEffect(() => {
@@ -69,282 +78,287 @@ export default function Announcements() {
       setIsLoading(false);
     }, (error) => {
       console.error('Error fetching notifications:', error);
-      setErrorMessage('নোটিশ তালিকা লোড করতে সমস্যা হয়েছে।');
       setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
+  const handleDeleteRequest = (item: Announcement) => {
+    setModalConfig({
+      isOpen: true,
+      type: 'confirm',
+      title: 'নোটিফিকেশন মুছে ফেলা',
+      message: `আপনি কি নিশ্চিত যে "${item.title}" নোটিফিকেশনটি চিরতরে মুছে ফেলতে চান?`,
+      confirmText: 'হ্যাঁ, মুছে ফেলুন',
+      cancelText: 'বাতিল',
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          await deleteDoc(doc(db, 'notifications', item.id));
+          if (announcements.length - 1 <= (currentPage - 1) * itemsPerPage && currentPage > 1) {
+            setCurrentPage((prev) => prev - 1);
+          }
+        } catch (err: any) {
+          console.error('Error deleting notice:', err);
+          setTimeout(() => {
+            setModalConfig({
+              isOpen: true,
+              type: 'error',
+              title: 'ত্রুটি',
+              message: 'নোটিশটি মুছে ফেলা সম্ভব হয়নি।',
+              confirmText: 'ঠিক আছে',
+              onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+            });
+          }, 300);
+        }
+      },
+      onCancel: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+    });
+  };
+
+  // Filter announcements
+  const filteredAnnouncements = announcements.filter(a => {
+    const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          a.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMajlis = selectedMajlisFilter === 'সকল' || a.targetMajlis === selectedMajlisFilter;
+    return matchesSearch && matchesMajlis;
+  });
+
   // Pagination calculations
-  const totalItems = announcements.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalItems = filteredAnnouncements.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = announcements.slice(indexOfFirstItem, indexOfLastItem);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !description.trim()) return;
-
-    setIsSubmitting(true);
-    setSuccessMessage('');
-    setErrorMessage('');
-
-    try {
-      // 1. Create document in Firestore `notifications` collection
-      const newDocRef = await addDoc(collection(db, 'notifications'), {
-        title: title.trim(),
-        description: description.trim(),
-        link: link.trim(),
-        targetMajlis,
-        createdAt: serverTimestamp()
-      });
-
-      // 2. Trigger FCM Push Notification to all subscribed devices
-      try {
-        await fetch('/api/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: title.trim(),
-            description: description.trim(),
-            link: link.trim(),
-            targetMajlis,
-            docId: newDocRef.id,
-          }),
-        });
-      } catch (fcmErr) {
-        console.warn('FCM Push notification warning:', fcmErr);
-      }
-
-      setSuccessMessage('নোটিফিকেশন সফলভাবে তৈরি হয়েছে এবং সকল মোবাইলে FCM পুষ্প নোটিফিকেশন হিসেবে পাঠানো হয়েছে!');
-      setTitle('');
-      setLink('');
-      setDescription('');
-      setTargetMajlis('সকল');
-      setCurrentPage(1);
-    } catch (err: any) {
-      console.error('Error sending announcement:', err);
-      setErrorMessage('নোটিফিকেশন পাঠাতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('আপনি কি নিশ্চিত যে এই নোটিশটি মুছে ফেলতে চান?')) return;
-
-    try {
-      await deleteDoc(doc(db, 'notifications', id));
-      if (announcements.length - 1 <= (currentPage - 1) * itemsPerPage && currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
-      }
-    } catch (err) {
-      console.error('Error deleting notice:', err);
-      alert('নোটিশটি মুছে ফেলা সম্ভব হয়নি।');
-    }
-  };
+  const currentItems = filteredAnnouncements.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ color: 'var(--text-dark)', fontSize: '28px', fontWeight: 'bold' }}>ঘোষণা ও ডাইনামিক নোটিফিকেশন প্যানেল</h1>
-        <p style={{ color: 'var(--text-light)', marginTop: '6px' }}>মোবাইল অ্যাপে ডাইনামিক নোটিফিকেশন ও ঘোষণা পাঠানোর মাধ্যম</p>
+      {/* Custom Glassmorphic Modal */}
+      <CustomModal
+        isOpen={modalConfig.isOpen}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+        onConfirm={modalConfig.onConfirm}
+        onCancel={modalConfig.onCancel}
+      />
+
+      {/* Header & Send Action Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1 style={{ color: '#F8FAFC', fontSize: '28px', fontWeight: 'bold' }}>ঘোষণা ও নোটিফিকেশন হিস্ট্রি</h1>
+          <p style={{ color: '#94A3B8', marginTop: '6px' }}>মোবাইল অ্যাপ ব্যবহারকারীদের কাছে পাঠানো ইউনিভার্সাল পুশ নোটিফিকেশন তালিকা</p>
+        </div>
+
+        <Link
+          href="/announcements/create"
+          className="btn btn-primary"
+          style={{
+            padding: '12px 22px',
+            fontSize: '15px',
+            fontWeight: 'bold',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '10px',
+            textDecoration: 'none'
+          }}
+        >
+          <i className="fa-solid fa-paper-plane" style={{ fontSize: '18px' }} />
+          <span>নতুন নোটিফিকেশন পাঠান</span>
+        </Link>
       </div>
 
-      <UserStatsWidget />
+      {/* Main Full-Width Announcements Card */}
+      <div className="card">
+        {/* Search & Filter Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ position: 'relative', minWidth: '280px', flex: 1, maxWidth: '400px' }}>
+            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="শিরোনাম বা বিবরণ লিখে খুঁজুন..."
+              style={{ width: '100%', padding: '12px 14px 12px 42px', fontSize: '14px' }}
+            />
+          </div>
 
-      {successMessage && (
-        <div style={{
-          backgroundColor: '#DCFCE7',
-          color: '#15803D',
-          border: '1px solid #86EFAC',
-          padding: '14px 18px',
-          borderRadius: '10px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600
-        }}>
-          <i className="fa-solid fa-circle-check" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div style={{
-          backgroundColor: '#FEE2E2',
-          color: '#B91C1C',
-          border: '1px solid #FCA5A5',
-          padding: '14px 18px',
-          borderRadius: '10px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600
-        }}>
-          <i className="fa-solid fa-triangle-exclamation" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      <div className="grid-2">
-        {/* Form section */}
-        <div className="card" style={{ height: 'fit-content' }}>
-          <h2 style={{ fontSize: '18px', marginBottom: '20px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <i className="fa-solid fa-paper-plane" style={{ color: 'var(--primary-color)' }}></i> নতুন নোটিফিকেশন তৈরি করুন
-          </h2>
-          
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>নোটিফিকেশনের শিরোনাম (Title) *</label>
-              <input 
-                type="text" 
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="যেমন: আগামী মাসিক সভার সময়সূচী..." 
-                style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }} 
-                required
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>লক্ষ্যভিত্তিক মজলিস (Target Group)</label>
-              <select
-                value={targetMajlis}
-                onChange={(e) => setTargetMajlis(e.target.value)}
-                style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: 'white' }}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {['সকল', 'খেলাফত মজলিস', 'ছাত্র মজলিস', 'যুব মজলিস', 'শ্রমিক মজলিস', 'মহিলা মজলিস'].map((maj) => (
+              <button
+                key={maj}
+                onClick={() => {
+                  setSelectedMajlisFilter(maj);
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: selectedMajlisFilter === maj ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  color: selectedMajlisFilter === maj ? '#10B981' : '#94A3B8',
+                  transition: 'all 0.2s'
+                }}
               >
-                <option value="সকল">সকল ব্যবহারকারী (All App Users)</option>
-                <option value="খেলাফত মজলিস">খেলাফত মজলিস</option>
-                <option value="ছাত্র মজলিস">বাংলাদেশ ইসলামী ছাত্র মজলিস</option>
-                <option value="যুব মজলিস">বাংলাদেশ ইসলামী যুব মজলিস</option>
-                <option value="শ্রমিক মজলিস">বাংলাদেশ ইসলামী শ্রমিক মজলিস</option>
-                <option value="মহিলা মজলিস">খেলাফত মহিলা মজলিস</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>ওয়েব লিংক (Optional)</label>
-              <input 
-                type="url" 
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder="যেমন: https://example.com/details (যদি থাকে)" 
-                style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }} 
-              />
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>বিস্তারিত বিবরণ (Description / Body) *</label>
-              <textarea 
-                rows={4} 
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="বিস্তারিত নোটিফিকেশন বর্ণনা লিখুন..." 
-                style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }}
-                required
-              ></textarea>
-            </div>
-
-            <button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="btn btn-primary" 
-              style={{ width: '100%', height: '48px', fontSize: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            >
-              {isSubmitting ? (
-                <>
-                  <i className="fa-solid fa-spinner fa-spin" />
-                  <span>পাঠানো হচ্ছে...</span>
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-paper-plane" />
-                  <span>নোটিফিকেশন ও ঘোষণা পাঠান</span>
-                </>
-              )}
-            </button>
-          </form>
+                {maj}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* List section with pagination */}
-        <div className="card">
-          <h2 style={{ fontSize: '18px', marginBottom: '20px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <i className="fa-solid fa-bell" style={{ color: 'var(--primary-color)' }}></i> ইউনিভার্সাল নোটিফিকেশন হিস্ট্রি
-          </h2>
-
-          {isLoading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>
-              <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '24px', marginBottom: '10px' }} />
-              <p>লোডিং হচ্ছে...</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', minHeight: '300px' }}>
-              {currentItems.map((item) => (
-                <div key={item.id} style={{ padding: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '5px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <i className="fa-regular fa-calendar" /> {item.createdAt}
-                      <span style={{ backgroundColor: '#E0F2FE', color: '#0369A1', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>
-                        {item.targetMajlis}
-                      </span>
+        {/* List Section */}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-light)' }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '28px', color: '#10B981', marginBottom: '12px' }}></i>
+            <p>ফায়ারস্টোর থেকে নোটিফিকেশন লোড হচ্ছে...</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '300px' }}>
+            {currentItems.map((item) => (
+              <div 
+                key={item.id} 
+                style={{
+                  padding: '18px 20px',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '16px',
+                  background: 'rgba(30, 41, 59, 0.4)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '16px',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#F8FAFC', margin: 0 }}>
+                      {item.title}
+                    </h3>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      color: '#10B981',
+                      fontWeight: 'bold'
+                    }}>
+                      {item.targetMajlis}
                     </span>
                   </div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '6px', color: 'var(--text-dark)' }}>{item.title}</h3>
-                  <p style={{ fontSize: '14px', color: 'var(--text-light)', lineHeight: '1.5', marginBottom: item.link ? '10px' : '0' }}>{item.description}</p>
-                  {item.link && (
-                    <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '600' }}>
-                      <i className="fa-solid fa-link" /> বিস্তারিত লিংক দেখুন
-                    </a>
-                  )}
-                  
-                  <button 
-                    onClick={() => handleDelete(item.id)}
-                    style={{ position: 'absolute', top: '16px', right: '16px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: '6px' }}
-                    title="মুছে ফেলুন"
-                  >
-                    <i className="fa-solid fa-trash" />
-                  </button>
+
+                  <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 10px 0', lineHeight: '1.5' }}>
+                    {item.description}
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--text-light)', flexWrap: 'wrap' }}>
+                    <span><i className="fa-regular fa-clock" /> {item.createdAt}</span>
+                    {item.link && (
+                      <a 
+                        href={item.link} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ color: '#38BDF8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <i className="fa-solid fa-link" /> ওয়েব লিংক দেখুন
+                      </a>
+                    )}
+                  </div>
                 </div>
-              ))}
 
-              {announcements.length === 0 && (
-                <p style={{ color: 'var(--text-light)', fontSize: '14px', textAlign: 'center', padding: '40px' }}>কোনো নোটিফিকেশন পাওয়া যায়নি।</p>
-              )}
-            </div>
-          )}
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '10px' }}>
-              <p style={{ color: 'var(--text-light)', fontSize: '13px' }}>
-                মোট {totalItems} টির মধ্যে {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, totalItems)} দেখানো হচ্ছে
-              </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="btn"
-                  style={{ background: '#f1f5f9', padding: '6px 12px', fontSize: '13px', color: currentPage === 1 ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                <button
+                  onClick={() => handleDeleteRequest(item)}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: '#FCA5A5',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="ডিলিট করুন"
                 >
-                  <i className="fa-solid fa-chevron-left" /> পূর্ববর্তী
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  className="btn"
-                  style={{ background: '#f1f5f9', padding: '6px 12px', fontSize: '13px', color: currentPage === totalPages || totalPages === 0 ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === totalPages || totalPages === 0 ? 'not-allowed' : 'pointer' }}
-                >
-                  পরবর্তী <i className="fa-solid fa-chevron-right" />
+                  <i className="fa-solid fa-trash" />
+                  <span>মুছুন</span>
                 </button>
               </div>
+            ))}
+
+            {filteredAnnouncements.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  margin: '0 auto 16px auto',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#10B981',
+                  fontSize: '28px',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}>
+                  <i className="fa-solid fa-bell-slash" />
+                </div>
+                <h3 style={{ color: '#F8FAFC', fontSize: '16px', fontWeight: 'bold', marginBottom: '6px' }}>
+                  কোনো নোটিফিকেশন হিস্ট্রি পাওয়া যায়নি
+                </h3>
+                <p style={{ fontSize: '13px', maxWidth: '340px', margin: '0 auto 16px auto', color: '#94A3B8', lineHeight: '1.5' }}>
+                  উপরে "নতুন নোটিফিকেশন পাঠান" বাটনে ক্লিক করে অ্যাপ ব্যবহারকারীদের জন্য বিজ্ঞপ্তি রিলিজ করুন।
+                </p>
+                <Link
+                  href="/announcements/create"
+                  className="btn btn-primary"
+                  style={{ padding: '10px 20px', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+                >
+                  <i className="fa-solid fa-paper-plane" />
+                  <span>নতুন নোটিফিকেশন পাঠান</span>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', flexWrap: 'wrap', gap: '10px' }}>
+            <p style={{ color: 'var(--text-light)', fontSize: '13px' }}>
+              মোট {totalItems} টি নোটিফিকেশনের মধ্যে {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, totalItems)} দেখানো হচ্ছে
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="btn"
+                style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '8px 16px', fontSize: '13px', color: currentPage === 1 ? 'rgba(255, 255, 255, 0.3)' : '#F8FAFC', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                <i className="fa-solid fa-chevron-left"></i> পূর্ববর্তী
+              </button>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="btn"
+                style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '8px 16px', fontSize: '13px', color: currentPage === totalPages || totalPages === 0 ? 'rgba(255, 255, 255, 0.3)' : '#F8FAFC', cursor: currentPage === totalPages || totalPages === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                পরবর্তী <i className="fa-solid fa-chevron-right"></i>
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

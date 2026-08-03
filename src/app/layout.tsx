@@ -8,8 +8,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Mojlish Admin",
+  title: "মজলিস এডমিন প্যানেল",
   description: "Admin Web for Khelafat Mojlish App",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
