@@ -251,37 +251,6 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
               </>
             )}
           </button>
-
-          {/* Allowed Emails Info */}
-          <div style={{
-            marginTop: '32px',
-            paddingTop: '20px',
-            borderTop: '1px solid #334155',
-            textAlign: 'center'
-          }}>
-            <p style={{ fontSize: '12px', color: '#64748B', margin: 0, fontWeight: 500 }}>
-              অনুমোদিত ইমেইল সমূহের তালিকা:
-            </p>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              marginTop: '8px'
-            }}>
-              {ALLOWED_EMAILS.map((email) => (
-                <span key={email} style={{
-                  fontSize: '12px',
-                  color: '#10B981',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontFamily: 'monospace'
-                }}>
-                  {email}
-                </span>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     );
