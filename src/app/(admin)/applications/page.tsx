@@ -1,8 +1,11 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 
 interface Application {
-  id: number;
+  id: string;
   name: string;
   phone: string;
   district: string;
@@ -10,27 +13,56 @@ interface Application {
   age: string;
   facebook?: string;
   date: string;
+  majlis?: string;
 }
 
 export default function ApplicationsPage() {
-  const [applications] = useState<Application[]>([
-    { id: 1, name: 'আব্দুল্লাহ আল নোমান', phone: '০১৭১২৩৪৫৬৭৮', district: 'ঢাকা', profession: 'ছাত্র', age: '২২', facebook: 'facebook.com/noman', date: '২০২৬-০৭-০৮' },
-    { id: 2, name: 'রাকিবুল হাসান', phone: '০১৯৮৭৬৫৪৩২১', district: 'সিলেট', profession: 'চাকরিজীবী', age: '২৮', facebook: 'facebook.com/rakib', date: '২০২৬-০৭-০৭' },
-    { id: 3, name: 'তামিম ইকবাল', phone: '০১৮২২৩৩৪৪৫৫', district: 'চট্টগ্রাম', profession: 'ব্যবসায়ী', age: '৩৫', date: '২০২৬-০৭-০৬' },
-    { id: 4, name: 'সাকিব আল হাসান', phone: '০১৬৬৬৭৭৮৮৯৯', district: 'মাগুরা', profession: 'ছাত্র', age: '২০', facebook: 'facebook.com/sakib', date: '২০২৬-০৭-০ shadow' },
-    { id: 5, name: 'মাহমুদুল্লাহ রিয়াদ', phone: '০১৫৫৫৪৪৩৩২২', district: 'ময়মনসিংহ', profession: 'চাকরিজীবী', age: '৩২', date: '২০২৬-০৭-০৪' },
-    { id: 6, name: 'মুশফিকুর রহিম', phone: '০১৭৭৭৮৮৮৯৯৯', district: 'বগুড়া', profession: 'ছাত্র', age: '২১', date: '২০২৬-০৭-০৩' },
-    { id: 7, name: 'তাসকিন আহমেদ', phone: '০১৮৮৮৯৯৯০০০', district: 'ঢাকা', profession: 'ব্যবসায়ী', age: '২৭', date: '২০২৬-০৭-০২' },
-    { id: 8, name: 'মেহেদী হাসান মিরাজ', phone: '০১৯৯৯০০০১১১', district: 'খুলনা', profession: 'ছাত্র', age: '২৩', date: '২০২৬-০৭-০১' },
-    { id: 9, name: 'মুস্তাফিজুর রহমান', phone: '০制造৭৭৭২২', district: 'সাতক্ষীরা', profession: 'ছাত্র', age: '২৪', date: '২০২৬-০৬-৩০' },
-    { id: 10, name: 'লিটন দাস', phone: '০১৮৮৮৩৩৩৩২২', district: 'দিনাজপুর', profession: 'চাকরিজীবী', age: '২৯', date: '২০২৬-০৬-২৯' },
-    { id: 11, name: 'নাজমুল হোসেন শান্ত', phone: '০১৯৯৯৪৪৪৪৩৩', district: 'রাজশাহী', profession: 'ছাত্র', age: '২২', date: '২০২৬-০৬-২৮' },
-    { id: 12, name: 'শরিফুল ইসলাম', phone: '০১৬৬৬৫৫৫৫৪৪', district: 'পঞ্চগড়', profession: 'ছাত্র', age: '২০', date: '২০২৬-০৬-২৭' },
-  ]);
-
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const itemsPerPage = 10;
+
+  // Real-time subscription to Firestore `member_applications` collection
+  useEffect(() => {
+    setIsLoading(true);
+    const q = query(collection(db, 'member_applications'), orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedApps: Application[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          fetchedApps.push({
+            id: docSnap.id,
+            name: data.name || 'নাম বিহীন',
+            phone: data.phone || 'N/A',
+            district: data.district || 'অজানা',
+            profession: data.profession || 'N/A',
+            age: data.age || 'N/A',
+            facebook: data.facebook || '',
+            majlis: data.majlis || 'সকল',
+            date: data.createdAt
+              ? data.createdAt.toDate().toLocaleDateString('bn-BD', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              : 'সদ্য',
+          });
+        });
+        setApplications(fetchedApps);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching member applications:', error);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // Pagination calculations
   const totalItems = applications.length;
@@ -39,14 +71,48 @@ export default function ApplicationsPage() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = applications.slice(indexOfFirstItem, indexOfLastItem);
 
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই আবেদনটি মুছে ফেলতে চান?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'member_applications', id));
+      if (selectedApp?.id === id) setSelectedApp(null);
+    } catch (err) {
+      console.error('Error deleting application:', err);
+      alert('আবেদনটি মুছে ফেলা সম্ভব হয়নি।');
+    }
+  };
+
+  const exportCSV = () => {
+    if (applications.length === 0) {
+      alert('এক্সপোর্ট করার মতো কোনো আবেদন ডাটা নেই।');
+      return;
+    }
+    const headers = ['নাম,ফোন,জেলা,পেশা,বয়স,ফেসবুক,তারিখ\n'];
+    const rows = applications.map(
+      (a) => `"${a.name}","${a.phone}","${a.district}","${a.profession}","${a.age}","${a.facebook}","${a.date}"\n`
+    );
+    const blob = new Blob([...headers, ...rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `member_applications_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h1 style={{ color: 'var(--text-dark)', fontSize: '28px', fontWeight: 'bold' }}>সদস্যপদ আবেদন সমূহ</h1>
-          <p style={{ color: 'var(--text-light)', marginTop: '8px' }}>মোবাইল অ্যাপ থেকে আসা সকল আবেদনের সংক্ষিপ্ত তালিকা</p>
+          <p style={{ color: 'var(--text-light)', marginTop: '8px' }}>মোবাইল অ্যাপ থেকে আসা সকল সদস্যপদ আবেদনের রিয়েল-টাইম তালিকা</p>
         </div>
-        <button className="btn btn-primary"><i className="fa-solid fa-download"></i> এক্সপোর্ট (CSV)</button>
+        <button onClick={exportCSV} className="btn btn-primary">
+          <i className="fa-solid fa-download"></i> এক্সপোর্ট (CSV)
+        </button>
       </div>
 
       <div style={{ maxWidth: '300px', marginBottom: '20px' }}>
@@ -57,68 +123,95 @@ export default function ApplicationsPage() {
       </div>
 
       <div className="card">
-        <div className="table-responsive">
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-light)' }}>
-                <th style={{ padding: '16px 12px' }}>আবেদনকারীর নাম</th>
-                <th style={{ padding: '16px 12px' }}>আবেদনের তারিখ</th>
-                <th style={{ padding: '16px 12px', textAlign: 'right' }}>বিস্তারিত</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentItems.map((app) => (
-                <tr 
-                  key={app.id} 
-                  style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
-                  onClick={() => setSelectedApp(app)}
-                >
-                  <td style={{ padding: '16px 12px', fontWeight: 'bold', color: 'var(--text-dark)' }}>{app.name}</td>
-                  <td style={{ padding: '16px 12px', color: 'var(--text-light)' }}>{app.date}</td>
-                  <td style={{ padding: '16px 12px', textAlign: 'right' }}>
-                    <button 
-                      className="btn" 
-                      style={{ background: '#f1f5f9', color: 'var(--primary-dark)', padding: '6px 14px', fontSize: '13px', fontWeight: 'bold' }}
-                    >
-                      ভিউ ডিটেইলস
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination UI */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '10px' }}>
-          <p style={{ color: 'var(--text-light)', fontSize: '14px' }}>
-            মোট {totalItems} টি আবেদনের মধ্যে {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, totalItems)} দেখানো হচ্ছে
-          </p>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentPage(prev => Math.max(prev - 1, 1));
-              }}
-              disabled={currentPage === 1}
-              className="btn"
-              style={{ background: '#f1f5f9', color: currentPage === 1 ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-            >
-              <i className="fa-solid fa-chevron-left"></i> পূর্ববর্তী
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentPage(prev => Math.min(prev + 1, totalPages));
-              }}
-              disabled={currentPage === totalPages}
-              className="btn"
-              style={{ background: '#f1f5f9', color: currentPage === totalPages ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-            >
-              পরবর্তী <i className="fa-solid fa-chevron-right"></i>
-            </button>
+        {isLoading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '24px', marginBottom: '10px' }} />
+            <p>আবেদন তালিকা লোড করা হচ্ছে...</p>
           </div>
-        </div>
+        ) : totalItems === 0 ? (
+          <div style={{ padding: '50px 20px', textAlign: 'center', color: 'var(--text-light)' }}>
+            <i className="fa-solid fa-folder-open" style={{ fontSize: '48px', color: '#cbd5e1', marginBottom: '16px' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-dark)' }}>কোনো সদস্যপদ আবেদন পাওয়া যায়নি</h3>
+            <p style={{ fontSize: '14px', marginTop: '6px' }}>মোবাইল অ্যাপ থেকে ব্যবহারকারীরা আবেদন জমা দিলে তা এখানে দেখাবে।</p>
+          </div>
+        ) : (
+          <>
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-light)' }}>
+                    <th style={{ padding: '16px 12px' }}>আবেদনকারীর নাম</th>
+                    <th style={{ padding: '16px 12px' }}>ফোন নাম্বার</th>
+                    <th style={{ padding: '16px 12px' }}>জেলা</th>
+                    <th style={{ padding: '16px 12px' }}>আবেদনের তারিখ</th>
+                    <th style={{ padding: '16px 12px', textAlign: 'right' }}>অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentItems.map((app) => (
+                    <tr 
+                      key={app.id} 
+                      style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+                      onClick={() => setSelectedApp(app)}
+                    >
+                      <td style={{ padding: '16px 12px', fontWeight: 'bold', color: 'var(--text-dark)' }}>{app.name}</td>
+                      <td style={{ padding: '16px 12px', color: 'var(--text-dark)' }}>{app.phone}</td>
+                      <td style={{ padding: '16px 12px', color: 'var(--text-light)' }}>{app.district}</td>
+                      <td style={{ padding: '16px 12px', color: 'var(--text-light)' }}>{app.date}</td>
+                      <td style={{ padding: '16px 12px', textAlign: 'right' }}>
+                        <button 
+                          className="btn" 
+                          style={{ background: '#f1f5f9', color: 'var(--primary-dark)', padding: '6px 14px', fontSize: '13px', fontWeight: 'bold', marginRight: '8px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedApp(app);
+                          }}
+                        >
+                          ভিউ ডিটেইলস
+                        </button>
+                        <button
+                          className="btn"
+                          style={{ background: '#fee2e2', color: '#ef4444', padding: '6px 10px', fontSize: '13px' }}
+                          onClick={(e) => handleDelete(app.id, e)}
+                          title="মুছে ফেলুন"
+                        >
+                          <i className="fa-solid fa-trash" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination UI */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <p style={{ color: 'var(--text-light)', fontSize: '14px' }}>
+                  মোট {totalItems} টি আবেদনের মধ্যে {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, totalItems)} দেখানো হচ্ছে
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="btn"
+                    style={{ background: '#f1f5f9', color: currentPage === 1 ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className="fa-solid fa-chevron-left" /> পূর্ববর্তী
+                  </button>
+                  <button 
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="btn"
+                    style={{ background: '#f1f5f9', color: currentPage === totalPages ? '#cbd5e1' : 'var(--text-dark)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                  >
+                    পরবর্তী <i className="fa-solid fa-chevron-right" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Dedicated View Details Drawer/Modal */}
@@ -157,7 +250,7 @@ export default function ApplicationsPage() {
                 onClick={() => setSelectedApp(null)}
                 style={{ background: 'none', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer' }}
               >
-                <i className="fa-solid fa-xmark"></i>
+                <i className="fa-solid fa-xmark" />
               </button>
             </div>
             
@@ -193,8 +286,8 @@ export default function ApplicationsPage() {
                 <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 'bold' }}>ফেসবুক প্রোফাইল</span>
                   <p style={{ fontSize: '15px', fontWeight: '600', color: 'var(--primary-dark)', marginTop: '4px' }}>
-                    <a href={`https://${selectedApp.facebook}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
-                      <i className="fa-brands fa-facebook"></i> {selectedApp.facebook}
+                    <a href={selectedApp.facebook.startsWith('http') ? selectedApp.facebook : `https://${selectedApp.facebook}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                      <i className="fa-brands fa-facebook" /> {selectedApp.facebook}
                     </a>
                   </p>
                 </div>
