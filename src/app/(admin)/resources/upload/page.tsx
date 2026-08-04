@@ -270,7 +270,7 @@ export default function ResourceUpload() {
                 <option value="খেলাফত মজলিস">খেলাফত মজলিস</option>
                 <option value="ইসলামী যুব মজলিস">ইসলামী যুব মজলিস</option>
                 <option value="বাংলাদেশ ইসলামী ছাত্র মজলিস">বাংলাদেশ ইসলামী ছাত্র মজলিস</option>
-                <option value="বাংলাদেশ ইসলামী শ্রমিক মজলিস">বাংলাদেশ ইসলামী শ্রমিক মজলিস</option>
+                <option value="ইসলামী শ্রমিক মজলিস">ইসলামী শ্রমিক মজলিস</option>
                 <option value="বাংলাদেশ ইসলামী মহিলা মজলিস">বাংলাদেশ ইসলামী মহিলা মজলিস</option>
               </select>
             </div>

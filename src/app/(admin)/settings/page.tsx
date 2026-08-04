@@ -29,7 +29,7 @@ const MAJLIS_LIST: MajlisInfo[] = [
   { id: 'khelafat', name: 'খেলাফত মজলিস', badgeColor: '#059669', icon: 'fa-mosque' },
   { id: 'jubo', name: 'ইসলামী যুব মজলিস', badgeColor: '#0284C7', icon: 'fa-user-ninja' },
   { id: 'chatro', name: 'বাংলাদেশ ইসলামী ছাত্র মজলিস', badgeColor: '#D97706', icon: 'fa-graduation-cap' },
-  { id: 'labor', name: 'বাংলাদেশ ইসলামী শ্রমিক মজলিস', badgeColor: '#DC2626', icon: 'fa-helmet-safety' },
+  { id: 'labor', name: 'ইসলামী শ্রমিক মজলিস', badgeColor: '#DC2626', icon: 'fa-helmet-safety' },
   { id: 'women', name: 'বাংলাদেশ ইসলামী মহিলা মজলিস', badgeColor: '#EC4899', icon: 'fa-person-dress' },
 ];
 
